@@ -1,8 +1,11 @@
 
 
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 95bd7e2d9faeb91ab45bf5bd1d2faad63c3ab4c4
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -148,11 +151,17 @@ const App: React.FC = () => {
   // Handlers
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+<<<<<<< HEAD
     if (loginCredentials.username === 'msebaie' && loginCredentials.password === '2356') {
         setIsAuthenticated(true);
         localStorage.setItem('ae_auth', 'true');
     } else {
         alert(lang === 'ar' ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password');
+=======
+    if (loginCredentials.username && loginCredentials.password) {
+        setIsAuthenticated(true);
+        localStorage.setItem('ae_auth', 'true');
+>>>>>>> 95bd7e2d9faeb91ab45bf5bd1d2faad63c3ab4c4
     }
   };
 
