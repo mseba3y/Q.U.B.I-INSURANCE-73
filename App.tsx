@@ -1,12 +1,6 @@
-
-
-
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 95bd7e2d9faeb91ab45bf5bd1d2faad63c3ab4c4
 import React, { useState, useEffect } from 'react';
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged, signOut } from "firebase/auth";
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import AttendanceManager from './components/AttendanceManager';
@@ -30,6 +24,19 @@ import { Employee, AttendanceRecord, AnnualLeaveRequest, SavedDocument } from '.
 import { Lock, User, LogIn } from 'lucide-react';
 import { translations } from './utils/translations';
 
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyCuRfIK7fVlL5NptRm9NATs8a6denXJ4Z8",
+  authDomain: "qubiinsurance73.firebaseapp.com",
+  projectId: "qubiinsurance73",
+  storageBucket: "qubiinsurance73.firebasestorage.app",
+  messagingSenderId: "859059365584",
+  appId: "1:859059365584:web:b74acb7434bffc45c5a0d5",
+  measurementId: "G-4ZJBYVQKJ0"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
 // Safe UUID Generator
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -51,17 +58,15 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<'en' | 'ar'>('ar');
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     try {
-        const saved = localStorage.getItem('ae_theme');
-        return saved === 'dark';
+      const saved = localStorage.getItem('ae_theme');
+      return saved === 'dark';
     } catch { return false; }
   });
 
   // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('ae_auth') === 'true';
-  });
-  const [loginCredentials, setLoginCredentials] = useState({ username: '', password: '' });
-  
+  const [user, setUser] = useState<any>(null);
+  const [loginCredentials, setLoginCredentials] = useState({ email: '', password: '' });
+
   // Lifted Date State
   const today = new Date();
   const lastWeek = new Date(today);
@@ -82,7 +87,7 @@ const App: React.FC = () => {
       return Array.isArray(parsed) ? parsed : INITIAL_EMPLOYEES;
     } catch (e) { return INITIAL_EMPLOYEES; }
   });
-  
+
   // Persisted State - Attendance Records
   const [records, setRecords] = useState<AttendanceRecord[]>(() => {
     try {
@@ -148,29 +153,38 @@ const App: React.FC = () => {
     catch (e) { console.error('Archive storage error', e); }
   }, [savedDocuments]);
 
+  // Firebase Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return unsubscribe;
+  }, []);
+
   // Handlers
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-<<<<<<< HEAD
-    if (loginCredentials.username === 'msebaie' && loginCredentials.password === '2356') {
-        setIsAuthenticated(true);
-        localStorage.setItem('ae_auth', 'true');
-    } else {
-        alert(lang === 'ar' ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid username or password');
-=======
-    if (loginCredentials.username && loginCredentials.password) {
-        setIsAuthenticated(true);
-        localStorage.setItem('ae_auth', 'true');
->>>>>>> 95bd7e2d9faeb91ab45bf5bd1d2faad63c3ab4c4
+    try {
+      await signInWithEmailAndPassword(auth, loginCredentials.email, loginCredentials.password);
+    } catch (error) {
+      alert(lang === 'ar' ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة' : 'Invalid email or password');
     }
   };
 
-  const handleLogout = () => {
-    if (window.confirm(lang === 'ar' ? 'هل أنت متأكد من تسجيل الخروج؟' : 'Are you sure you want to logout?')) {
-        setIsAuthenticated(false);
-        localStorage.removeItem('ae_auth');
-        setLoginCredentials({ username: '', password: '' });
-        setActiveTab('dashboard');
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!loginCredentials.email) {
+      alert(lang === 'ar' ? 'ادخل البريد الإلكتروني أولاً' : 'Enter your email first');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, loginCredentials.email);
+      alert(lang === 'ar' ? 'تم إرسال رابط إعادة تعيين كلمة المرور على بريدك الإلكتروني' : 'Password reset email sent');
+    } catch (error) {
+      alert(lang === 'ar' ? 'حدث خطأ أثناء إرسال البريد' : 'Error sending reset email');
     }
   };
 
@@ -189,7 +203,6 @@ const App: React.FC = () => {
   };
   const handleClearRecords = () => setRecords([]);
   const handleAddAnnualLeave = (request: AnnualLeaveRequest) => setAnnualLeaves(prev => [...prev, request]);
-  
   const handleLoadData = (newEmployees: Employee[], newRecords: AttendanceRecord[], newLeaves?: AnnualLeaveRequest[]) => {
     if (Array.isArray(newEmployees)) setEmployees(newEmployees);
     if (Array.isArray(newRecords)) setRecords(newRecords);
@@ -209,7 +222,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ARCHIVE HANDLERS
   const handleSaveDocument = (doc: Omit<SavedDocument, 'id' | 'createdAt'>) => {
     const newDoc: SavedDocument = {
       ...doc,
@@ -219,13 +231,10 @@ const App: React.FC = () => {
     setSavedDocuments(prev => [newDoc, ...prev]);
   };
 
-  const handleDeleteDocument = (id: string) => {
-    setSavedDocuments(prev => prev.filter(d => d.id !== id));
-  };
+  const handleDeleteDocument = (id: string) => setSavedDocuments(prev => prev.filter(d => d.id !== id));
 
   const handleLoadDocument = (doc: SavedDocument) => {
     setLoadedDocument(doc);
-    // Map document type to tab ID
     const typeToTab: Record<string, string> = {
         'CasualLeave': 'casualLeave',
         'AnnualLeave': 'annualLeave',
@@ -241,16 +250,48 @@ const App: React.FC = () => {
         'BankDepositG4': 'bankDepositG4',
         'NotesForm': 'notesForm'
     };
-    if (typeToTab[doc.type]) {
-        setActiveTab(typeToTab[doc.type]);
-    }
+    if (typeToTab[doc.type]) setActiveTab(typeToTab[doc.type]);
   };
 
-  // When switching tabs manually via Sidebar, we want to clear the loaded document
   const handleManualTabChange = (tab: string) => {
     setActiveTab(tab);
     setLoadedDocument(null);
   };
+
+  const isRTL = lang === 'ar';
+
+  if (!user) {
+    const t = translations[lang];
+    return (
+      <div className={`min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950`} dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="w-full max-w-md p-8 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800">
+          <h1 className="text-2xl font-bold mb-6">{t.sidebar.title}</h1>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input
+              type="email"
+              placeholder="Email"
+              required
+              value={loginCredentials.email}
+              onChange={e => setLoginCredentials({ ...loginCredentials, email: e.target.value })}
+              className="w-full p-3 border rounded-xl"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              required
+              value={loginCredentials.password}
+              onChange={e => setLoginCredentials({ ...loginCredentials, password: e.target.value })}
+              className="w-full p-3 border rounded-xl"
+            />
+            <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl"> {lang === 'ar' ? 'تسجيل الدخول' : 'Sign In'} </button>
+          </form>
+          <button onClick={handleForgotPassword} className="mt-4 text-sm text-indigo-600 underline">
+            {lang === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot Password?'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -276,120 +317,11 @@ const App: React.FC = () => {
     }
   };
 
-  const isRTL = lang === 'ar';
-
-  if (!isAuthenticated) {
-     const t = translations[lang];
-     
-     return (
-       <div 
-         className={`min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative overflow-hidden`}
-         dir={isRTL ? 'rtl' : 'ltr'}
-         style={{ fontFamily: isRTL ? 'Cairo, sans-serif' : 'Inter, sans-serif' }}
-       >
-          {/* Background Pattern */}
-          <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
-            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-          </div>
-
-          <div className="w-full max-w-md p-8 bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 relative z-10 animate-in fade-in zoom-in-95">
-             <div className="text-center mb-8">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-indigo-500/30 mb-4">
-                  Q
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{t.sidebar.title}</h1>
-                <p className="text-slate-500 dark:text-slate-400">{t.dashboard.welcome}</p>
-             </div>
-
-             <form onSubmit={handleLogin} className="space-y-6">
-                <div>
-                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{lang === 'ar' ? 'اسم المستخدم' : 'Username'}</label>
-                   <div className="relative">
-                      <div className={`absolute inset-y-0 ${isRTL ? 'right-0 pr-3' : 'left-0 pl-3'} flex items-center pointer-events-none text-slate-400`}>
-                         <User size={18} />
-                      </div>
-                      <input 
-                        type="text" 
-                        required
-                        value={loginCredentials.username}
-                        onChange={e => setLoginCredentials({...loginCredentials, username: e.target.value})}
-                        className={`w-full ${isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white`}
-                        placeholder="admin"
-                        autoFocus
-                      />
-                   </div>
-                </div>
-
-                <div>
-                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{lang === 'ar' ? 'كلمة المرور' : 'Password'}</label>
-                   <div className="relative">
-                      <div className={`absolute inset-y-0 ${isRTL ? 'right-0 pr-3' : 'left-0 pl-3'} flex items-center pointer-events-none text-slate-400`}>
-                         <Lock size={18} />
-                      </div>
-                      <input 
-                        type="password" 
-                        required
-                        value={loginCredentials.password}
-                        onChange={e => setLoginCredentials({...loginCredentials, password: e.target.value})}
-                        className={`w-full ${isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all dark:text-white`}
-                        placeholder="••••••••"
-                      />
-                   </div>
-                </div>
-
-                <button 
-                  type="submit"
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-600/20 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2"
-                >
-                  <LogIn size={20} />
-                  {lang === 'ar' ? 'تسجيل الدخول' : 'Sign In'}
-                </button>
-             </form>
-
-             <div className="mt-8 flex items-center justify-center gap-4 text-xs font-medium text-slate-500 border-t border-slate-100 dark:border-slate-800 pt-6">
-                <button onClick={() => setLang(lang === 'en' ? 'ar' : 'en')} className="hover:text-indigo-600 transition-colors bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
-                   {lang === 'en' ? 'العربية' : 'English'}
-                </button>
-                <button onClick={() => setDarkMode(!darkMode)} className="hover:text-indigo-600 transition-colors bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
-                   {darkMode ? (lang === 'ar' ? 'وضع النهار' : 'Light Mode') : (lang === 'ar' ? 'وضع الليل' : 'Dark Mode')}
-                </button>
-             </div>
-             
-             {/* Login Page Footer */}
-             <div className="mt-6 text-center">
-                 <p className="text-slate-400 dark:text-slate-600 text-[10px] font-semibold">
-                    Created By Mohamed El-Sebaie
-                 </p>
-             </div>
-          </div>
-       </div>
-     );
-  }
-
   return (
-    <div 
-      className="min-h-screen flex bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative overflow-hidden" 
-      dir={isRTL ? 'rtl' : 'ltr'}
-      style={{ fontFamily: isRTL ? 'Cairo, sans-serif' : 'Inter, sans-serif' }}
-    >
-      <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-      </div>
-      <div>
-        <Sidebar activeTab={activeTab} setActiveTab={handleManualTabChange} lang={lang} setLang={setLang} darkMode={darkMode} setDarkMode={setDarkMode} onLogout={handleLogout} />
-      </div>
-      <main className={`flex-1 p-6 md:p-8 overflow-y-auto h-screen transition-all duration-300 z-10 ${isRTL ? 'md:mr-72' : 'md:ml-72'}`}>
-        <div className="max-w-7xl mx-auto pb-10 flex flex-col min-h-[calc(100vh-100px)]">
-          <div className="flex-1">
-             {renderContent()}
-          </div>
-          
-          <footer className="mt-10 py-6 text-center border-t border-slate-200 dark:border-slate-800/50">
-             <p className="text-slate-400 dark:text-slate-600 text-sm font-semibold tracking-wide flex items-center justify-center gap-1">
-                Created By Mohamed El-Sebaie
-             </p>
-          </footer>
-        </div>
+    <div className={`min-h-screen flex bg-slate-50 dark:bg-slate-950`} dir={isRTL ? 'rtl' : 'ltr'}>
+      <Sidebar activeTab={activeTab} setActiveTab={handleManualTabChange} lang={lang} setLang={setLang} darkMode={darkMode} setDarkMode={setDarkMode} onLogout={handleLogout} />
+      <main className="flex-1 p-6">
+        {renderContent()}
       </main>
     </div>
   );
