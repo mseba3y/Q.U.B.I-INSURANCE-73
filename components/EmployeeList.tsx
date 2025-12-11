@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
-import { Employee } from '../types';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Mail, Briefcase, Edit, User, Calendar } from 'lucide-react';
 import { translations } from '../utils/translations';
-
-interface EmployeeListProps {
-  employees: Employee[];
-  onAddEmployee: (emp: Employee) => void;
-  onEditEmployee: (emp: Employee) => void;
-  onRemoveEmployee: (id: string) => void;
-  lang: 'en' | 'ar';
-}
+import { 
+  collection, addDoc, getDocs, updateDoc, deleteDoc, doc 
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -18,17 +13,31 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, onEditEmployee, onRemoveEmployee, lang }) => {
+const EmployeeList = ({ lang }) => {
   const t = translations[lang].employees;
   const isRTL = lang === 'ar';
-  
+
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<Employee>>({
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState({
     name: '',
     role: '',
     department: '',
   });
+
+  // Load employees from Firestore
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const snap = await getDocs(collection(db, "employees"));
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setEmployees(list);
+      setLoading(false);
+    };
+    fetchEmployees();
+  }, []);
 
   const handleAddClick = () => {
     setEditingId(null);
@@ -36,49 +45,64 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
     setShowForm(true);
   };
 
-  const handleEditClick = (emp: Employee) => {
+  const handleEditClick = (emp) => {
     setEditingId(emp.id);
     setFormData({ name: emp.name, role: emp.role, department: emp.department });
     setShowForm(true);
   };
 
-  const handleDeleteClick = (id: string) => {
-     if (window.confirm(translations[lang].attendance.confirmRemoveEmp)) {
-       onRemoveEmployee(id);
-     }
+  const handleDeleteClick = async (id) => {
+    if (window.confirm(t.confirmRemoveEmp)) {
+      await deleteDoc(doc(db, "employees", id));
+      setEmployees(employees.filter(e => e.id !== id));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (formData.name && formData.role && formData.department) {
       if (editingId) {
-         const original = employees.find(e => e.id === editingId);
-         if (original) {
-             onEditEmployee({
-                 ...original,
-                 name: formData.name,
-                 role: formData.role,
-                 department: formData.department
-             });
-         }
-      } else {
-         const emp: Employee = {
-            id: generateId(),
-            name: formData.name,
-            role: formData.role,
-            department: formData.department,
-            joinDate: new Date().toISOString().split('T')[0],
-            avatarUrl: `https://picsum.photos/seed/${Math.random()}/200`
-         };
-         onAddEmployee(emp);
+        // Update Firestore
+        const docRef = doc(db, "employees", editingId);
+        await updateDoc(docRef, {
+          name: formData.name,
+          role: formData.role,
+          department: formData.department
+        });
+
+        setEmployees(employees.map(e => 
+          e.id === editingId
+            ? { ...e, name: formData.name, role: formData.role, department: formData.department }
+            : e
+        ));
+      } 
+      else {
+        // Add new employee
+        const newEmp = {
+          name: formData.name,
+          role: formData.role,
+          department: formData.department,
+          joinDate: new Date().toISOString().split('T')[0],
+          avatarUrl: `https://picsum.photos/seed/${Math.random()}/200`
+        };
+
+        const ref = await addDoc(collection(db, "employees"), newEmp);
+        setEmployees([...employees, { id: ref.id, ...newEmp }]);
       }
+
       setFormData({ name: '', role: '', department: '' });
       setShowForm(false);
     }
   };
 
+  if (loading) {
+    return <p className="text-center py-10 text-slate-500">Loading...</p>;
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">{t.title}</h2>
@@ -110,9 +134,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 required
               />
             </div>
+
             <div>
-               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.rolePlaceholder}</label>
-               <input
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.rolePlaceholder}</label>
+              <input
                 type="text"
                 value={formData.role}
                 onChange={e => setFormData({...formData, role: e.target.value})}
@@ -120,9 +145,10 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 required
               />
             </div>
+
             <div>
-               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.deptPlaceholder}</label>
-               <input
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t.deptPlaceholder}</label>
+              <input
                 type="text"
                 value={formData.department}
                 onChange={e => setFormData({...formData, department: e.target.value})}
@@ -130,6 +156,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 required
               />
             </div>
+
             <div className="md:col-span-3 flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
               <button 
                 type="button" 
@@ -138,6 +165,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
               >
                 {t.cancel}
               </button>
+
               <button 
                 type="submit" 
                 className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-600/20 transition-all"
@@ -183,15 +211,18 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ employees, onAddEmployee, o
                 <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg"><Briefcase size={14} /></div>
                 <span>{emp.department}</span>
               </div>
+
               <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
                 <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg"><Mail size={14} /></div>
                 <span>{emp.name.toLowerCase().replace(' ', '.')}@company.com</span>
               </div>
-               <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+
+              <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
                 <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg"><Calendar size={14} /></div>
                 <span>{t.joined} {emp.joinDate}</span>
               </div>
             </div>
+
           </div>
         ))}
       </div>
