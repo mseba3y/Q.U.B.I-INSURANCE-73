@@ -1,6 +1,4 @@
-// firebase.ts
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 
 // إعدادات مشروع Firebase
@@ -16,7 +14,6 @@ const firebaseConfig = {
 
 // تهيئة Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
 // تهيئة Firestore
 export const db = getFirestore(app);
