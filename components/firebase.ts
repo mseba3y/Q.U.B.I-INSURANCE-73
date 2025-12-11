@@ -1,9 +1,9 @@
-// Import the functions you need from the SDKs you need
+// firebase.ts
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore"; // مهم لإستخدام db
+import { getFirestore } from "firebase/firestore";
 
-// Firebase configuration
+// إعدادات مشروع Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCuRfIK7fVlL5NptRm9NATs8a6denXJ4Z8",
   authDomain: "qubiinsurance73.firebaseapp.com",
@@ -14,9 +14,9 @@ const firebaseConfig = {
   measurementId: "G-4ZJBYVQKJ0"
 };
 
-// Initialize Firebase
+// تهيئة Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
-// Initialize Firestore and export it
+// تهيئة Firestore
 export const db = getFirestore(app);
